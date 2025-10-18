@@ -1,5 +1,5 @@
 resource "aws_mq_broker" "rabbitmq" {
-  broker_name                = "bytecraft-rabbitmq"
+  broker_name                = "carsties-rabbitmq"
   engine_type                = "RabbitMQ"
   engine_version             = "3.13"
   host_instance_type         = "mq.t3.micro"
@@ -20,9 +20,9 @@ resource "aws_mq_broker" "rabbitmq" {
   }
 
   tags = {
-    Name        = "bytecraft-rabbitmq"
-    Project     = "ByteCraft"
-    Environment = "dev"
+    Name        = "rabbitmq-broker"
+    Project     = var.projectName
+    Environment = var.environment
   }
 
   lifecycle {
@@ -35,14 +35,14 @@ resource "aws_mq_broker" "rabbitmq" {
 
 resource "aws_security_group" "rabbitmq_sg" {
   name        = "rabbitmq-sg"
-  description = "Allow Memcached access from EC2"
+  description = "Allow RabbitMQ access from EC2"
   vpc_id      = module.vpc.vpc_id
 
   ingress {
     from_port       = 5671
     to_port         = 5671
     protocol        = "tcp"
-    security_groups = [aws_security_group.beanstalk_ec2_sg.id]
+    security_groups = [module.eks.node_security_group_id]
   }
 
   egress {
@@ -53,8 +53,8 @@ resource "aws_security_group" "rabbitmq_sg" {
   }
 
   tags = {
-    Name        = "rabbitmq-sg"
-    Project     = "ByteCraft"
-    Environment = "dev"
+    Name        = "rabbitmq-security-group"
+    Project     = var.projectName
+    Environment = var.environment
   }
 }
