@@ -33,19 +33,29 @@ module "eks" {
     one = {
       name           = "node-group-1"
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.small"]
+      instance_types = ["m7i-flex.large"]
       min_size       = 1
       max_size       = 3
       desired_size   = 2
+
+      metadata_options = {
+        http_tokens                 = "required"
+        http_put_response_hop_limit = 2
+      }
     }
 
     two = {
       name           = "node-group-2"
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.small"]
+      instance_types = ["m7i-flex.large"]
       min_size       = 1
       max_size       = 2
       desired_size   = 1
+    
+      metadata_options = {
+        http_tokens                 = "required"
+        http_put_response_hop_limit = 2
+      }
     }
   }
 
