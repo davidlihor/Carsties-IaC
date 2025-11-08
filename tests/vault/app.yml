@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/service: "https://vault.vault.svc.cluster.local:8200"
+        vault.hashicorp.com/tls-skip-verify: "false"
+        vault.hashicorp.com/role: "carsties-role"
+        vault.hashicorp.com/tls-secret: "vault-ca"
+        vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
+        vault.hashicorp.com/agent-inject-secret-config.txt: "kv-v2/data/carsties/secret"
+        vault.hashicorp.com/agent-inject-template-config.txt: |
+          {{- with secret "kv-v2/data/carsties/secret" -}}
+          export APP_EMAIL="{{ .Data.data.email }}"
+          export APP_PASSWORD="{{ .Data.data.password }}"
+          {{- end }}
+    spec:
+      serviceAccountName: vault-auth
+      containers:
+      - name: ncs
+        image: nginx
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            if [ -f /vault/secrets/config.txt ]; then
+              . /vault/secrets/config.txt
+            fi
+            echo "Email=$APP_EMAIL, Password=$APP_PASSWORD"
+            sleep 3600
