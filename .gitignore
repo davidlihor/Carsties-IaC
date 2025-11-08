@@ -2,6 +2,7 @@
 *.tfstate
 *.tfstate.backup
 *.zip
+*.backup
 
 # Crash log
 crash.log

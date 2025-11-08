@@ -31,4 +31,5 @@ output "carsties_role_name" {
 output "kubernetes_ca_cert" {
   description = "CA cert from kube-root-ca.crt"
   value       = data.kubernetes_config_map.root_ca.data["ca.crt"]
+  sensitive = true
 }
