@@ -152,7 +152,7 @@ Create the CA secret:
 kubectl get secret vault-tls -n vault -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
 kubectl create secret generic vault-ca --from-file=ca.crt=ca.crt
 ```
-> The same secret (`vault-ca`) must exist in any namespace that needs Vault TLS communication.
+ The same secret (`vault-ca`) must exist in any namespace that needs Vault TLS communication.
 
 ```bash
 helm install vault hashicorp/vault \
