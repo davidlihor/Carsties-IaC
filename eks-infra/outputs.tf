@@ -45,5 +45,5 @@ output "current_region" {
 
 output "vault_kms_key_arn" {
   description = "KMS Key ARN"
-  value = aws_kms_key.vault.arn
+  value       = aws_kms_key.vault.arn
 }

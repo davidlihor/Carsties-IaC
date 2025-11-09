@@ -61,27 +61,35 @@ jobs:
             -input=false
         working-directory: ${{ matrix.service.path }}
 
-      - name: Terraform Format Check 
+      - name: Terraform Format Check
+        id: fmt
         run: terraform fmt -check
         working-directory: ${{ matrix.service.path }}
 
-      - name: Terraform Validate 
+      - name: Terraform Validate
+        id: validate
         run: terraform validate
         working-directory: ${{ matrix.service.path }}
 
       - name: Terraform Plan
         id: plan
+        if: ${{ steps.fmt.outcome == 'success' && steps.validate.outcome == 'success' }}
         run: terraform plan -no-color -input=false -out planfile
-        continue-on-error: true
         working-directory: ${{ matrix.service.path }}
 
       - name: Save Plan Output
-        if: always()
-        run: terraform show -no-color planfile > plan.txt
+        if: ${{ steps.plan.outcome == 'success' }}
+        run: |
+          if [ -f planfile ]; then
+            terraform show -no-color planfile > plan.txt
+          else
+            echo "planfile missing" >&2
+            exit 1
+          fi
         working-directory: ${{ matrix.service.path }}
 
       - name: Upload Plan as Artifact
-        if: always()
+        if: ${{ steps.plan.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan-${{ matrix.service.name }}
@@ -89,12 +97,6 @@ jobs:
             ${{ matrix.service.path }}/plan.txt
             ${{ matrix.service.path }}/planfile
           retention-days: 14
-
-      - name: Fail if plan failed
-        if: steps.plan.outcome == 'failure'
-        run: |
-          echo "Terraform plan failed"
-          exit 1
 
   security-scan:
     name: IaC Security Scan

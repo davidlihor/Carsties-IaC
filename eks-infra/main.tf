@@ -21,6 +21,6 @@ data "aws_availability_zones" "available" {}
 data "aws_caller_identity" "current" {}
 
 locals {
-  cluster_name = "${var.clusterName}-${var.environment}"
+  cluster_name  = "${var.clusterName}-${var.environment}"
   instance_name = "${var.instanceName}-${var.environment}"
 }

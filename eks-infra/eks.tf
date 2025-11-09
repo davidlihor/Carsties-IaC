@@ -51,7 +51,7 @@ module "eks" {
       min_size       = 1
       max_size       = 2
       desired_size   = 1
-    
+
       metadata_options = {
         http_tokens                 = "required"
         http_put_response_hop_limit = 2
@@ -74,5 +74,5 @@ resource "aws_security_group_rule" "allow_8080_from_master_to_workers" {
   description = "Allow port 8080 inbound traffic from EKS control plane SG"
 
   source_security_group_id = module.eks.cluster_security_group_id
-  security_group_id = module.eks.node_security_group_id
+  security_group_id        = module.eks.node_security_group_id
 }

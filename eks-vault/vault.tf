@@ -9,7 +9,7 @@ resource "vault_kv_secret_v2" "carsties" {
   name  = "carsties/secret"
 
   data_json = jsonencode({
-    email = "testuser@email.com"
+    email    = "testuser@email.com"
     password = "testpass"
   })
 }
