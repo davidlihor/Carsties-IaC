@@ -3,15 +3,15 @@ on:
   push:
     branches:
       - main
-    # paths: 
-    #   - eks-infra/**
-    #   - eks-vault/**
+    paths: 
+      - eks-infra/**
+      - eks-vault/**
   pull_request:
     branches:
       - main
-    # paths: 
-    #   - eks-infra/**
-    #   - eks-vault/**
+    paths: 
+      - eks-infra/**
+      - eks-vault/**
   workflow_dispatch:
 
 env:
@@ -145,12 +145,6 @@ jobs:
           output_format: sarif
           output_file_path: ${{ github.workspace }}/${{ matrix.service.path }}/checkov-results.sarif
           soft_fail: true
-      
-      - run: |
-          echo "Listing ${{ matrix.service.path }}"
-          ls -la "${{ matrix.service.path }}" || true
-          echo "Listing workspace root"
-          ls -la "${{ github.workspace }}" || true
 
       - name: Upload Checkov results
         uses: actions/upload-artifact@v4

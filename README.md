@@ -20,7 +20,7 @@ It automates the setup of an **EKS cluster**, **Vault**, **External Secrets Oper
 - **IRSA (IAM Roles for Service Accounts)** – Secure AWS IAM integration with pods  
 - **kubectl** – Kubernetes CLI for cluster management  
 - **GitHub Actions** – CI/CD automation
-
+- **Checkov** – Static analysis & policy‑as‑code for infrastructure
 
 ## 📁 Repository Structure
 
