@@ -143,16 +143,27 @@ jobs:
         with:
           directory: ${{ matrix.service.path }}
           output_format: sarif
-          output_file_path: checkov-results.sarif
+          output_file_path: ${{ matrix.service.path }}/checkov-results.sarif
           soft_fail: false
 
+      - name: Check SARIF exists
+        id: sarif_check
+        run: |
+          if [ -f "${{ matrix.service.path }}/checkov-results.sarif" ]; then
+            echo "sarif_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "sarif_exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Upload Checkov results
+        if: ${{ steps.sarif_check.outputs.sarif_exists == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: checkov-report-${{ matrix.service.name }}
           path: ${{ matrix.service.path }}/checkov-results.sarif
 
       - name: Upload SARIF to GitHub Security tab
+        if: ${{ steps.sarif_check.outputs.sarif_exists == 'true' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: ${{ matrix.service.path }}/checkov-results.sarif
