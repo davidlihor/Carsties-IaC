@@ -14,5 +14,13 @@ terraform {
     }
   }
 
+  backend "s3" {
+    bucket  = "carsties-terraform-state"
+    key     = "terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
+    use_lockfile = true
+  }
+
   required_version = ">= 1.13.3"
 }

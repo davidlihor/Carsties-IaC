@@ -1,0 +1,180 @@
+name: Terraform CI/CD
+on:
+  push:
+    branches:
+      - main
+    # paths: 
+    #   - eks-infra/**
+    #   - eks-vault/**
+  pull_request:
+    branches:
+      - main
+    # paths: 
+    #   - eks-infra/**
+    #   - eks-vault/**
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  BUCKET_TF_STATE: ${{ secrets.BUCKET_TF_STATE }}
+  EKS_TF_PATH: eks-infra
+  TF_VERSION: 1.13.1
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  terraform-plan-check:
+    name: Terraform Check & Plan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: "EKS Infrastructure"
+            path: "eks-infra"
+          - name: "Vault Configuration"
+            path: "eks-vault"
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4.3.1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+        with:
+          terraform-version: ${{ env.TF_VERSION }}
+          working-directory: ${{ matrix.service.path }}
+  
+      - name: Terraform Init (remote S3)
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.BUCKET_TF_STATE }}" \
+            -backend-config="key=${{ matrix.service.path }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -input=false
+        working-directory: ${{ matrix.service.path }}
+
+      - name: Terraform Format Check 
+        run: terraform fmt -check
+        working-directory: ${{ matrix.service.path }}
+
+      - name: Terraform Validate 
+        run: terraform validate
+        working-directory: ${{ matrix.service.path }}
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -input=false -out planfile
+        continue-on-error: true
+        working-directory: ${{ matrix.service.path }}
+
+      - name: Save Plan Output
+        if: always()
+        run: terraform show -no-color planfile > plan.txt
+        working-directory: ${{ matrix.service.path }}
+
+      - name: Upload Plan as Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ matrix.service.name }}
+          path: |
+            ${{ matrix.service.path }}/plan.txt
+            ${{ matrix.service.path }}/planfile
+          retention-days: 14
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: |
+          echo "Terraform plan failed"
+          exit 1
+
+  security-scan:
+    name: IaC Security Scan
+    runs-on: ubuntu-latest
+    needs: terraform-plan-check
+    strategy:
+      matrix:
+        service:
+          - name: "EKS Infrastructure"
+            path: "eks-infra"
+          - name: "Vault Configuration"
+            path: "eks-vault"
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+        with:
+          terraform-version: ${{ env.TF_VERSION }}
+          working-directory: ${{ matrix.service.path }}
+
+      - name: Terraform Init (local)
+        run: terraform init -backend=false
+        working-directory: ${{ matrix.service.path }}
+
+      - name: Run Checkov (IaC Security)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: ${{ matrix.service.path }}
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          soft_fail: false
+
+      - name: Upload Checkov results
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-report-${{ matrix.service.name }}
+          path: ${{ matrix.service.path }}/checkov-results.sarif
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ matrix.service.path }}/checkov-results.sarif
+
+  deploy-iac:
+    name: IaC Deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: 
+      - terraform-plan-check
+      - security-scan
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4.3.1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+        with:
+          terraform-version: ${{ env.TF_VERSION }}
+          working-directory: ${{ env.EKS_TF_PATH }}
+
+      - name: Terraform Init (remote S3)
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.BUCKET_TF_STATE }}" \
+            -backend-config="key=${{ env.EKS_TF_PATH }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -input=false
+        working-directory: ${{ env.EKS_TF_PATH }}
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false -parallelism=1
+        working-directory: ${{ env.EKS_TF_PATH }}
+

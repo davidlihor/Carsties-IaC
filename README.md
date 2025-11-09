@@ -6,12 +6,23 @@ This repository defines and provisions the **AWS infrastructure** for the Carsti
 It automates the setup of an **EKS cluster**, **Vault**, **External Secrets Operator**, **KMS**, **IRSA**, and related components required for secure application deployments.
 
 
+## 🧠 Technologies
 
-# 🧠 Tehnologies
+- **AWS**  
+  - **Core Infrastructure**: VPC, EC2, EKS, IAM, KMS, Load Balancer Controller  
+  - **Serverless & Messaging**: Lambda, SNS, EventBridge, S3  
+- **Terraform** – Infrastructure as Code for AWS and Vault resources  
+- **Kubernetes (EKS)** – Container orchestration platform  
+- **Helm** – Package manager for Kubernetes applications  
+- **HashiCorp Vault** – Secrets management and Kubernetes auth integration  
+- **External Secrets Operator (ESO)** – Sync secrets from Vault into Kubernetes  
+- **Cert-Manager** – Automated certificate management in Kubernetes  
+- **IRSA (IAM Roles for Service Accounts)** – Secure AWS IAM integration with pods  
+- **kubectl** – Kubernetes CLI for cluster management  
+- **GitHub Actions** – CI/CD automation
 
-AWS • Terraform • Kubernetes (EKS) • Helm • HashiCorp Vault • External Secrets Operator (ESO) • AWS KMS • Cert-Manager • AWS Load Balancer Controller • IRSA (IAM Roles for Service Accounts) • kubectl • GitHub Actions
 
-# 📁 Repository Structure
+## 📁 Repository Structure
 
 ```
 .
@@ -26,24 +37,20 @@ AWS • Terraform • Kubernetes (EKS) • Helm • HashiCorp Vault • External
 └── README.md
 ```
 
----
 
-#  Prerequisites
-
+##  Prerequisites
 Before deploying, ensure you have:
+| Tool        | Minimum Version | Purpose                          |
+|-------------|-----------------|----------------------------------|
+| AWS CLI     | latest          | Configure AWS credentials        |
+| kubectl     | v1.33+          | Manage Kubernetes cluster        |
+| Terraform   | v1.13+          | Provision AWS & Vault resources  |
+| Helm        | v3.18+          | Install Kubernetes packages      |
 
-* **AWS CLI** configured with valid credentials (`aws configure`)
-* **kubectl** v1.33+
-* **Terraform** v1.13+
-* **Helm** v3.18+
-* Access to an **S3 bucket** and **DynamoDB table** for Terraform state (recommended)
-* Proper IAM permissions to manage EKS, KMS, IAM, and VPC resources
 
----
+## Deployment Steps
 
-# Deployment Steps
-
-### 1. Deploy the EKS Infrastructure
+### 1. **Deploy the EKS Infrastructure**
 
 Navigate to the `eks-infra` folder and apply Terraform:
 
@@ -61,9 +68,9 @@ This creates:
 * KMS key for Vault and ESO
 * Load balancer and Helm setup resources
 
----
 
-### 2. Configure kubectl to Access the Cluster
+
+### 2. **Configure kubectl to Access the Cluster**
 
 ```bash
 aws eks update-kubeconfig --name carsties-eks-dev --region us-east-1
@@ -75,9 +82,9 @@ Verify connection:
 kubectl get nodes
 ```
 
----
 
-### 3. Install Required Helm Components
+
+### 3. **Install Required Helm Components**
 
 ####  • AWS Load Balancer Controller
 
@@ -90,9 +97,9 @@ helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
   --set serviceAccount.name=aws-load-balancer-controller
 ```
 
-> **Note:** The ALB Controller manifest can be found under `tests/alb/alb.yml`.
+**Note:** The ALB Controller manifest can be found under `tests/alb/alb.yml`.
 
----
+
 
 #### • External Secrets Operator (ESO)
 
@@ -113,7 +120,7 @@ Then apply the ESO configuration:
 kubectl apply -f tests/eso/
 ```
 
----
+
 
 #### • Cert-Manager
 
@@ -133,9 +140,9 @@ Apply certificate and issuer manifests:
 kubectl apply -f tests/certs/
 ```
 
----
 
-### 4. Deploy HashiCorp Vault
+
+### 4. **Deploy HashiCorp Vault**
 
 Vault handles secrets and dynamic credentials for workloads inside EKS.
 
@@ -156,9 +163,8 @@ helm install vault hashicorp/vault \
 
 
 
----
 
-### 5. Initialize and Verify Vault
+### 5. **Initialize and Verify Vault**
 
 Run the following commands to initialize Vault and verify its state:
 
@@ -175,9 +181,50 @@ If DNS is not configured, you can port-forward to access the UI locally:
 kubectl port-forward -n vault svc/vault 8200:8200
 ```
 
----
 
-### 6. Validate IRSA and Vault Integration
+### 6. **Deploy the Vault Integration**
+
+Navigate to the `eks-vault` folder:
+
+```bash
+cd eks-vault
+```
+
+First, create a `terraform.tfvars` file in this folder with the following variables:
+
+```hcl
+address     = "https://<vault-server-address>"
+token       = "<vault-root-token>"
+config_path = "~/.kube/config"
+```
+
+This file provides:
+- **Vault server address** – the URL of your Vault instance  
+- **Vault root token** – the root token used by Terraform to authenticate against Vault  
+- **Kubeconfig path** – the path to your EKS cluster’s kubeconfig file  
+
+Then initialize and apply Terraform:
+
+```bash
+terraform init
+terraform apply -auto-approve
+```
+
+This creates:
+
+- **Vault secrets engine mount** – `kv-v2` for storing application secrets  
+- **Vault KV secret** – example secret at `carsties/secret` containing email and password values  
+- **Vault policies** –  
+  - `carsties-policy`: grants read-only access to the `carsties/*` path  
+  - `admin-policy`: grants full administrative capabilities across all paths  
+- **Vault Kubernetes auth backend** – enabled at path `kubernetes`  
+- **Kubernetes CA config** – retrieved from the `kube-root-ca.crt` ConfigMap in the `kube-system` namespace  
+- **Vault Kubernetes auth backend config** – connects Vault to the EKS cluster using the CA certificate and API endpoint  
+- **Vault Kubernetes role** – `carsties-role`, bound to the `vault-auth` service account in the `default` namespace, associated with the `carsties-policy`, with a token TTL of 3600 seconds  
+
+
+
+### 7. **Validate IRSA and Vault Integration**
 
 You can use the provided test manifests to validate IAM roles for service accounts (IRSA) and secret injection:
 
@@ -196,7 +243,7 @@ kubectl get ingress -n vault
 
 If everything is configured correctly, the app should successfully pull secrets from Vault using ESO + KMS + IRSA.
 
----
+
 
 ## 🧩 Components Overview
 
@@ -211,7 +258,7 @@ If everything is configured correctly, the app should successfully pull secrets 
 
 
 
----
+
 
 ## 🧰 Useful Commands
 
@@ -236,4 +283,4 @@ helm uninstall <release> -n <namespace>
 
 ---
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
