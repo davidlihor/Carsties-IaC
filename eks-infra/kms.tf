@@ -5,7 +5,7 @@ resource "aws_kms_key" "vault" {
 }
 
 resource "aws_secretsmanager_secret" "vault_kms_arn" {
-  name = "vault/kmsArn-dev-key"
+  name = "vault/kmsArn-dev-key18"
 }
 
 resource "aws_secretsmanager_secret_version" "vault_kms_arn_value" {
