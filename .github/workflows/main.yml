@@ -71,10 +71,24 @@ jobs:
         run: terraform validate
         working-directory: ${{ matrix.service.path }}
 
+      - name: Check S3 state for eks-infra
+        id: check_s3
+        run: |
+          if aws s3api head-object --bucket "${{ env.BUCKET_TF_STATE }}" --key "eks-infra/terraform.tfstate" >/dev/null 2>&1; then
+            echo "state_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "state_exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Terraform Plan
         id: plan
-        if: ${{ steps.fmt.outcome == 'success' && steps.validate.outcome == 'success' }}
+        if: ${{ steps.fmt.outcome == 'success' && steps.validate.outcome == 'success' && (matrix.service.path != 'eks-vault' || steps.check_s3.outputs.state_exists == 'true') }}
         run: terraform plan -no-color -input=false -out planfile
+        working-directory: ${{ matrix.service.path }}
+
+      - name: Log plan skipped
+        if: ${{ steps.plan.outcome == 'skipped' }}
+        run: echo "Terraform plan skipped for ${{ matrix.service.name }} (missing inputs or previous step failed)"
         working-directory: ${{ matrix.service.path }}
 
       - name: Save Plan Output
